@@ -7,9 +7,13 @@ import org.java_websocket.handshake.ServerHandshake;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+
+import static java.util.Collections.singletonMap;
+import static java.util.stream.Collectors.toList;
 
 public class AsteroidsClientApplication {
     public static final String serverURI = "ws://127.0.0.1:8065/ship"; // TODO: change me to server URL
@@ -74,15 +78,25 @@ public class AsteroidsClientApplication {
 
             /* Get the rocks and the ships, map them to Java objects,
              * then sort them by distance (ascending.) Nearest first. */
-            final Stream<Asteroid> asteroids = frame.get("rocks").children()
+            final List<Asteroid> asteroids = frame.get("rocks").children()
                     .map(Asteroid::new)
-                    .sorted((a1, a2) -> Double.compare(a1.getDistance(), a2.getDistance()));
-            final Stream<Ship> ships = frame.get("ships").children()
+                    .sorted((a1, a2) -> Double.compare(a1.getDistance(), a2.getDistance()))
+                    .collect(toList());
+            final List<Ship> ships = frame.get("ships").children()
                     .map(Ship::new)
-                    .sorted((s1, s2) -> Double.compare(s1.getDistance(), s2.getDistance()));
+                    .sorted((s1, s2) -> Double.compare(s1.getDistance(), s2.getDistance()))
+                    .collect(toList());
 
+            final Stream<Target> targets = Stream.concat(asteroids.stream(), ships.stream());
 
-            final Optional<Asteroid> nearestAsteroidMaybe = asteroids
+            try {
+                if(targets.anyMatch(target -> isPointingAt(myBearing, target)))
+                    send(objectMapper.writeValueAsString(singletonMap("fire", true)));
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+            }
+
+            final Optional<Asteroid> nearestAsteroidMaybe = asteroids.stream()
                     .findFirst(); // take the first object in the stream, and...
 
             nearestAsteroidMaybe.ifPresent(nearestAsteroid -> {
@@ -106,7 +120,7 @@ public class AsteroidsClientApplication {
             });
         }
 
-        private boolean isPointingAt(Double myBearing, Asteroid target) {
+        private boolean isPointingAt(Double myBearing, Target target) {
             return Math.abs(myBearing - target.getBearing()) < 0.25;
         }
     }

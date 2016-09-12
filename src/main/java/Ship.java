@@ -3,7 +3,7 @@ import alexh.weak.Dynamic;
 /**
  * Created by joro on 11/09/2016.
  */
-public class Ship {
+public class Ship implements Target {
     public String name;
     public Double bearing;
     public Double distance;

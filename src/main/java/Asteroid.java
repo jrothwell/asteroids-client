@@ -3,7 +3,7 @@ import alexh.weak.Dynamic;
 /**
  * Created by joro on 11/09/2016.
  */
-public class Asteroid {
+public class Asteroid implements Target {
     public Integer id;
     public Double bearing;
     public Double size;
