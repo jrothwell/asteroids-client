@@ -2,17 +2,17 @@ import alexh.Fluent;
 import alexh.weak.Dynamic;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Stream;
 
-import static java.util.Collections.singletonMap;
 import static java.util.stream.Collectors.toList;
 
 public class AsteroidsClientApplication {
@@ -33,6 +33,9 @@ public class AsteroidsClientApplication {
 
     public class AsteroidsClient extends WebSocketClient {
 
+        public Logger logger = LogManager.getLogger(AsteroidsClient.class);
+
+
         public AsteroidsClient(URI uri) {
             super(uri);
         }
@@ -45,27 +48,28 @@ public class AsteroidsClientApplication {
 
         /**
          * This method gets called every time we get a fresh message from the server.
-         * This happens once every 0.1 seconds.
+         * This happens once every second.
          * NOTE: you can send messages to the server more often than this, if you want.
          * @param messageFromServer
          */
         @Override
         public void onMessage(String messageFromServer) { // fresh JSON frame from server
             try {
+                logger.trace("Message received from server");
                 processFrame(Dynamic.from(objectMapper.readValue(messageFromServer, Map.class)));
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.error("Failed deserialising message from server", e);
             }
         }
 
         @Override
         public void onClose(int i, String s, boolean b) {
-
+            logger.info("Connection closed: " + i + "," + s + "," + b);
         }
 
         @Override
         public void onError(Exception e) {
-            System.out.println("e.getMessage() = " + e.getMessage());
+            logger.error("Error received from server", e);
         }
 
         /**
@@ -73,51 +77,47 @@ public class AsteroidsClientApplication {
          * @param frame
          */
         public void processFrame(Dynamic frame) {
+            // TODO: change this method to make me faster, cleverer, etc.
+
             // Our ship's own bearing (or 'theta') in radians.
             final Double myBearing = frame.get("theta").as(Double.class);
+            logger.trace("My bearing is " + myBearing + " radians");
 
             /* Get the rocks and the ships, map them to Java objects,
              * then sort them by distance (ascending.) Nearest first. */
             final List<Asteroid> asteroids = frame.get("rocks").children()
                     .map(Asteroid::new)
-                    .sorted((a1, a2) -> Double.compare(a1.getDistance(), a2.getDistance()))
                     .collect(toList());
             final List<Ship> ships = frame.get("ships").children()
                     .map(Ship::new)
-                    .sorted((s1, s2) -> Double.compare(s1.getDistance(), s2.getDistance()))
                     .collect(toList());
 
-            final Stream<Target> targets = Stream.concat(asteroids.stream(), ships.stream());
+            final List<Target> targets = new ArrayList(asteroids);
+            targets.addAll(ships);
 
-            try {
-                if(targets.anyMatch(target -> isPointingAt(myBearing, target)))
-                    send(objectMapper.writeValueAsString(singletonMap("fire", true)));
-            } catch (JsonProcessingException e) {
-                e.printStackTrace();
+            Fluent.HashMap instructionMap = new Fluent.HashMap();
+
+            // If I can see a target, add a 'fire' instruction to the instruction map.
+            if(targets.stream().anyMatch(target -> isPointingAt(myBearing, target))) {
+                logger.info("I see a target... FIRING!");
+                instructionMap.append("fire", true);
             }
 
-            final Optional<Asteroid> nearestAsteroidMaybe = asteroids.stream()
-                    .findFirst(); // take the first object in the stream, and...
+            // Find a target - any target - and turn towards it.
+            targets.stream()
+                    .findFirst()
+                    .map(Target::getBearing)
+                    .ifPresent(newBearing -> {
+                        logger.info("Turning to new target at " + newBearing + " radians");
+                        instructionMap.append("theta", newBearing);
+                    });
 
-            nearestAsteroidMaybe.ifPresent(nearestAsteroid -> {
-                // ...if it exists... turn towards it.
-
-                System.out.println("My target is rock id " + nearestAsteroid.getId() +
-                        " which is at " + nearestAsteroid.getBearing() +
-                        " and is " + nearestAsteroid.getDistance() + "m away");
-
-                final Map<String, Double> instructionMap = new Fluent.HashMap()
-                    .append("theta", nearestAsteroid.getBearing()) // turn to the ship...
-                    .append("fire", isPointingAt(myBearing, nearestAsteroid));
-                    // and if we're pointing at it, SHOOT IT
-
-                try {
-                    // send the instruction back over the WebSocket
-                    send(objectMapper.writeValueAsString(instructionMap));
-                } catch (JsonProcessingException e) {
-                    e.printStackTrace();
-                }
-            });
+            try {
+                logger.trace("Sending instruction map to server");
+                send(objectMapper.writeValueAsString(instructionMap));
+            } catch (JsonProcessingException e) {
+                logger.error("Failed serialising message to server", e);
+            }
         }
 
         private boolean isPointingAt(Double myBearing, Target target) {
