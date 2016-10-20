@@ -84,8 +84,7 @@ public class AsteroidsClientApplication {
             final Double myBearing = frame.get("theta").as(Double.class);
             logger.trace("My bearing is " + myBearing + " radians");
 
-            /* Get the rocks and the ships, map them to Java objects,
-             * then sort them by distance (ascending.) Nearest first. */
+            /* Get the rocks and the ships, map them to Java objects. */
             final List<Asteroid> asteroids = frame.get("rocks").children()
                     .map(Asteroid::new)
                     .collect(toList());
@@ -109,8 +108,13 @@ public class AsteroidsClientApplication {
                     .findFirst()
                     .map(Target::getTheta)
                     .ifPresent(newTheta -> {
-                        logger.info("Turning to new target at " + newTheta + " radians");
-                        instructionMap.append("theta", newTheta);
+                        double newBearing = myBearing + newTheta;
+                        if(newBearing < 0)
+                            newBearing += 2 * Math.PI;
+                        if(newBearing > (2 * Math.PI))
+                            newBearing -= 2 * Math.PI;
+                        logger.info("Turning to new target at " + newBearing + " radians");
+                        instructionMap.append("theta", newBearing);
                     });
 
             try {
