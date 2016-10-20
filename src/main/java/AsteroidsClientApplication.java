@@ -34,7 +34,6 @@ public class AsteroidsClientApplication {
     public class AsteroidsClient extends WebSocketClient {
 
         public Logger logger = LogManager.getLogger(AsteroidsClient.class);
-        public Double currentBearing = 0.0;
 
 
         public AsteroidsClient(URI uri) {
