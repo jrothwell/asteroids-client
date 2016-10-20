@@ -3,5 +3,5 @@
  */
 public interface Target {
     Double getDistance();
-    Double getBearing();
+    Double getTheta();
 }

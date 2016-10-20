@@ -34,6 +34,7 @@ public class AsteroidsClientApplication {
     public class AsteroidsClient extends WebSocketClient {
 
         public Logger logger = LogManager.getLogger(AsteroidsClient.class);
+        public Double currentBearing = 0.0;
 
 
         public AsteroidsClient(URI uri) {
@@ -56,6 +57,7 @@ public class AsteroidsClientApplication {
         public void onMessage(String messageFromServer) { // fresh JSON frame from server
             try {
                 logger.trace("Message received from server");
+                System.out.println("messageFromServer = " + messageFromServer);
                 processFrame(Dynamic.from(objectMapper.readValue(messageFromServer, Map.class)));
             } catch (IOException e) {
                 logger.error("Failed deserialising message from server", e);
@@ -106,10 +108,10 @@ public class AsteroidsClientApplication {
             // Find a target - any target - and turn towards it.
             targets.stream()
                     .findFirst()
-                    .map(Target::getBearing)
-                    .ifPresent(newBearing -> {
-                        logger.info("Turning to new target at " + newBearing + " radians");
-                        instructionMap.append("theta", newBearing);
+                    .map(Target::getTheta)
+                    .ifPresent(newTheta -> {
+                        logger.info("Turning to new target at " + newTheta + " radians");
+                        instructionMap.append("theta", newTheta);
                     });
 
             try {
@@ -121,7 +123,7 @@ public class AsteroidsClientApplication {
         }
 
         private boolean isPointingAt(Double myBearing, Target target) {
-            return Math.abs(myBearing - target.getBearing()) < 0.25;
+            return Math.abs(myBearing - target.getTheta()) < 0.25;
         }
     }
 }

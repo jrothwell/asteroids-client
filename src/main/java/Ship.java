@@ -14,7 +14,7 @@ public class Ship implements Target {
         this.distance = d.get(2).as(Double.class);
     }
 
-    public Double getBearing() {
+    public Double getTheta() {
         return bearing;
     }
 

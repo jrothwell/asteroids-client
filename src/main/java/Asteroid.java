@@ -16,7 +16,7 @@ public class Asteroid implements Target {
         this.distance = d.get(3).as(Double.class);
     }
 
-    public Double getBearing() {
+    public Double getTheta() {
         return bearing;
     }
 
